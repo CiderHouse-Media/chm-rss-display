@@ -21,6 +21,7 @@ class Feed_Fetcher {
 
 	const TRANSIENT_PREFIX = 'chm_rss_';
 	const STALE_PREFIX     = 'chm_rss_stale_';
+	const REGISTRY_OPTION  = 'chm_rss_cache_keys';
 	const DEFAULT_TTL      = 6 * HOUR_IN_SECONDS;
 	const EDITOR_TTL       = 60;
 
@@ -44,7 +45,9 @@ class Feed_Fetcher {
 			$ttl = min( $ttl, self::EDITOR_TTL );
 		}
 
-		$key    = md5( $url );
+		// Version-scoped: a plugin update invalidates cached parses, so a
+		// parser fix is never trapped behind a stale transient for hours.
+		$key    = md5( CHM_RSS_VERSION . '|' . $url );
 		$cached = get_transient( self::TRANSIENT_PREFIX . $key );
 
 		if ( is_array( $cached ) ) {
@@ -64,12 +67,41 @@ class Feed_Fetcher {
 		$raw   = array_map( 'get_object_vars', $items );
 
 		set_transient( self::TRANSIENT_PREFIX . $key, $raw, $ttl );
+		$this->remember_key( $key );
 
 		if ( ! empty( $raw ) ) {
 			update_option( self::STALE_PREFIX . $key, $raw, false ); // autoload: no.
 		}
 
 		return $items;
+	}
+
+	/**
+	 * Delete every cached feed (transients + stale copies).
+	 * Backs the admin-bar "Refresh RSS Feed" action.
+	 */
+	public static function flush() {
+		$keys = get_option( self::REGISTRY_OPTION, [] );
+		foreach ( array_filter( (array) $keys, 'is_string' ) as $key ) {
+			delete_transient( self::TRANSIENT_PREFIX . $key );
+			delete_option( self::STALE_PREFIX . $key );
+		}
+		delete_option( self::REGISTRY_OPTION );
+	}
+
+	/**
+	 * Track active cache keys so flush() works on external object caches
+	 * (Redis/Memcached), where transients never appear in wp_options.
+	 *
+	 * @param string $key Cache key.
+	 */
+	protected function remember_key( $key ) {
+		$keys = get_option( self::REGISTRY_OPTION, [] );
+		$keys = is_array( $keys ) ? $keys : [];
+		if ( ! in_array( $key, $keys, true ) ) {
+			$keys[] = $key;
+			update_option( self::REGISTRY_OPTION, $keys, false );
+		}
 	}
 
 	/**
@@ -140,6 +172,11 @@ class Feed_Fetcher {
 				continue;
 			}
 
+			// The ISBN lives in the original Wowbrary link's i= param —
+			// extract it before clean_link() swaps in the direct URL.
+			$isbn = $this->extract_isbn( $link );
+			$link = $this->clean_link( $link );
+
 			// The feed embeds a "<span class='NUEITEM'>Downloadable Audio</span>"
 			// format chip inside the description. Drop it wholesale — otherwise
 			// tag-stripping later leaks its text into the blurb.
@@ -160,7 +197,7 @@ class Feed_Fetcher {
 					'image'       => $this->extract_image( $node ),
 					'timestamp'   => $this->parse_date( $this->node_text( $node, 'pubDate' ) ),
 					'category'    => sanitize_text_field( $this->node_text( $node, 'category' ) ),
-					'isbn'        => $this->extract_isbn( $link ),
+					'isbn'        => $isbn,
 				]
 			);
 		}
@@ -288,6 +325,47 @@ class Feed_Fetcher {
 		$ts = strtotime( $raw );
 
 		return false !== $ts ? $ts : null;
+	}
+
+	/**
+	 * Clean an outbound item link.
+	 *
+	 * Wowbrary links route through its l.aspx redirector with tracking-ish
+	 * params (u=, t=, rss). The c= param encodes the real destination:
+	 * numeric → Evergreen/VuFind catalog record, "WOV{n}" → OverDrive media.
+	 * Linking straight there drops the extra hop and params, and the
+	 * catalog sees this site as the traffic source. Unknown shapes keep
+	 * the (https-upgraded) original link.
+	 *
+	 * @param string $link Item link from the feed.
+	 * @return string
+	 */
+	protected function clean_link( $link ) {
+		// The feed emits plain http; every destination serves https.
+		$link = preg_replace( '#^http://#i', 'https://', (string) $link );
+
+		if ( ! apply_filters( 'chm_rss_direct_links', true ) || false === stripos( $link, 'wowbrary.org' ) ) {
+			return $link;
+		}
+
+		$query = wp_parse_url( $link, PHP_URL_QUERY );
+		if ( ! $query ) {
+			return $link;
+		}
+		parse_str( $query, $params );
+		$record = isset( $params['c'] ) ? (string) $params['c'] : '';
+
+		if ( '' !== $record && ctype_digit( $record ) ) {
+			$base = apply_filters( 'chm_rss_catalog_record_base', 'https://belchertwn.cwmars.org/Record/' );
+			return $base ? esc_url_raw( $base . $record, [ 'https' ] ) : $link;
+		}
+
+		if ( preg_match( '/^WOV(\d+)$/', $record, $m ) ) {
+			$base = apply_filters( 'chm_rss_econtent_base', 'https://cwmars.overdrive.com/media/' );
+			return $base ? esc_url_raw( $base . $m[1], [ 'https' ] ) : $link;
+		}
+
+		return $link;
 	}
 
 	/**

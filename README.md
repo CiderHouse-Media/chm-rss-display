@@ -46,6 +46,9 @@ Cards link to the item's catalog page (CW Mars borrow link), opening in a new ta
 | `chm_rss_resolve_hires` | `true` | Enable/disable hi-res cover lookup |
 | `chm_rss_jacket_base` | `https://bark.cwmars.org/opac/extras/ac/jacket/large/` | Evergreen jacket endpoint (swap for another consortium) |
 | `chm_rss_hires_time_budget` | `8.0` | Max seconds spent on cover lookups per cache refresh |
+| `chm_rss_direct_links` | `true` | Link straight to the catalog/OverDrive instead of through Wowbrary's redirector |
+| `chm_rss_catalog_record_base` | `https://belchertwn.cwmars.org/Record/` | Catalog record URL base for physical items |
+| `chm_rss_econtent_base` | `https://cwmars.overdrive.com/media/` | OverDrive URL base for e-content items |
 
 ## Architecture
 
@@ -73,6 +76,12 @@ chm-rss-display/
 - If the site runs a page cache (e.g. WP Rocket), new feed items appear after page-cache expiry/purge, not the moment the transient refreshes.
 
 ## Changelog
+
+### 1.0.2
+- New: "Refresh RSS Feed" admin-bar button (front end, admins only) — clears the cached feed and refetches on the spot
+- New: version-scoped cache keys — plugin updates automatically invalidate data parsed by the previous version
+- New: outbound links go directly to the destination (CW Mars catalog record for physical items, OverDrive for e-content) instead of through Wowbrary's `l.aspx` redirector; filterable via `chm_rss_direct_links`, `chm_rss_catalog_record_base`, `chm_rss_econtent_base`
+- Change: card links send an origin-only referrer (`referrerpolicy="strict-origin-when-cross-origin"`, `noreferrer` dropped) so the catalog sees the library site as the traffic source
 
 ### 1.0.1
 - Fix: covers no longer collapse to natural aspect under theme `img { height: auto }` resets (e.g. Hello Elementor) — the image reliably fills its 2:3 frame

@@ -31,6 +31,46 @@ final class Plugin {
 
 		// The editor preview iframe also needs the frontend assets registered.
 		add_action( 'elementor/preview/enqueue_styles', [ $this, 'register_assets' ] );
+
+		// Admin-bar "Refresh RSS Feed" — forces a fresh fetch on demand.
+		add_action( 'admin_bar_menu', [ $this, 'add_refresh_node' ], 90 );
+		add_action( 'template_redirect', [ $this, 'maybe_flush_cache' ] );
+	}
+
+	/**
+	 * Front-end admin-bar node that flushes the feed cache.
+	 *
+	 * @param \WP_Admin_Bar $bar Admin bar instance.
+	 */
+	public function add_refresh_node( $bar ) {
+		if ( is_admin() || ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		$bar->add_node(
+			[
+				'id'    => 'chm-rss-refresh',
+				'title' => esc_html__( 'Refresh RSS Feed', 'chm-rss-display' ),
+				'href'  => wp_nonce_url( add_query_arg( 'chm_rss_flush', '1' ), 'chm_rss_flush' ),
+				'meta'  => [
+					'title' => esc_attr__( 'Clear the cached feed and refetch it now', 'chm-rss-display' ),
+				],
+			]
+		);
+	}
+
+	/**
+	 * Handle the admin-bar flush action, then reload the page clean.
+	 */
+	public function maybe_flush_cache() {
+		if ( ! isset( $_GET['chm_rss_flush'] ) || ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		check_admin_referer( 'chm_rss_flush' );
+
+		Feed_Fetcher::flush();
+
+		wp_safe_redirect( remove_query_arg( [ 'chm_rss_flush', '_wpnonce' ] ) );
+		exit;
 	}
 
 	/**

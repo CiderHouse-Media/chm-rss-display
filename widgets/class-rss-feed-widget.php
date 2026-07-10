@@ -1147,11 +1147,14 @@ class Rss_Feed_Widget extends Widget_Base {
 			$classes[] = 'chm-rss-card--row';
 		}
 
+		// noopener without noreferrer + an origin-only referrer policy:
+		// the catalog/OverDrive should see this site as the traffic source,
+		// but never the full page path.
 		printf(
-			'<a class="%1$s" href="%2$s"%3$s>',
+			'<a class="%1$s" href="%2$s" referrerpolicy="strict-origin-when-cross-origin"%3$s>',
 			esc_attr( implode( ' ', $classes ) ),
 			esc_url( $item->link ),
-			$new_tab ? ' target="_blank" rel="noopener noreferrer"' : ''
+			$new_tab ? ' target="_blank" rel="noopener"' : ''
 		);
 
 		// Media.
