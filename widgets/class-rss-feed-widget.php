@@ -586,6 +586,23 @@ class Rss_Feed_Widget extends Widget_Base {
 			]
 		);
 
+		$this->add_control(
+			'image_fit',
+			[
+				'label'       => esc_html__( 'Image Fit', 'chm-rss-display' ),
+				'type'        => Controls_Manager::SELECT,
+				'default'     => 'contain',
+				'options'     => [
+					'contain' => esc_html__( 'Fit — show the full cover', 'chm-rss-display' ),
+					'cover'   => esc_html__( 'Fill — crop to the frame', 'chm-rss-display' ),
+				],
+				'description' => esc_html__( 'Fit shows odd-shaped art (CDs, audio) over a blurred backdrop; Fill crops it to the frame.', 'chm-rss-display' ),
+				'selectors'   => [
+					'{{WRAPPER}} .chm-rss-card__media .chm-rss-card__img' => 'object-fit: {{VALUE}};',
+				],
+			]
+		);
+
 		$this->add_responsive_control(
 			'image_radius',
 			[
@@ -1142,7 +1159,7 @@ class Rss_Feed_Widget extends Widget_Base {
 			echo '<div class="chm-rss-card__media">';
 			if ( $item->has_image() ) {
 				printf(
-					'<img class="chm-rss-card__img" src="%s" alt="%s" loading="lazy" decoding="async">',
+					'<span class="chm-rss-card__backdrop" style="background-image:url(%1$s)" aria-hidden="true"></span><img class="chm-rss-card__img" src="%1$s" alt="%2$s" loading="lazy" decoding="async">',
 					esc_url( $item->image ),
 					esc_attr( $item->title )
 				);

@@ -140,7 +140,16 @@ class Feed_Fetcher {
 				continue;
 			}
 
-			list( $author, $description ) = $this->split_author( $this->node_text( $node, 'description' ) );
+			// The feed embeds a "<span class='NUEITEM'>Downloadable Audio</span>"
+			// format chip inside the description. Drop it wholesale — otherwise
+			// tag-stripping later leaks its text into the blurb.
+			$raw_desc = preg_replace(
+				'#<span[^>]*NUEITEM[^>]*>.*?</span>#is',
+				'',
+				$this->node_text( $node, 'description' )
+			);
+
+			list( $author, $description ) = $this->split_author( $raw_desc );
 
 			$items[] = new Feed_Item(
 				[
@@ -225,7 +234,20 @@ class Feed_Fetcher {
 	 */
 	protected function split_author( $description ) {
 		$description = trim( (string) $description );
-		$pos         = strpos( $description, '. ' );
+
+		// Find the first ". " that isn't part of an initial — "By H. M. Wolfe."
+		// must split after "Wolfe", not after "H".
+		$pos    = false;
+		$offset = 0;
+		while ( false !== ( $found = strpos( $description, '. ', $offset ) ) ) {
+			$last_word = preg_replace( '/^.*\s/s', '', substr( $description, 0, $found ) );
+			if ( preg_match( '/^[A-Z]$/', $last_word ) ) {
+				$offset = $found + 2;
+				continue;
+			}
+			$pos = $found;
+			break;
+		}
 
 		if ( false === $pos ) {
 			return [ '', $description ];

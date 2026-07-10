@@ -74,6 +74,13 @@ chm-rss-display/
 
 ## Changelog
 
+### 1.0.1
+- Fix: covers no longer collapse to natural aspect under theme `img { height: auto }` resets (e.g. Hello Elementor) — the image reliably fills its 2:3 frame
+- Fix: authors with initials ("H. M. Wolfe") no longer truncate to the first initial when split from the description
+- Fix: the feed's embedded format chip ("Downloadable Audio") no longer leaks into description text
+- New: odd-shaped art (square CDs, landscape audio thumbnails) displays full-size over a blurred echo of the cover instead of letterboxing or cropping
+- New: "Image Fit" style control (Fit — full cover / Fill — crop to frame)
+
 ### 1.0.0
 - Initial release: carousel/grid/list views, full Elementor style controls, transient caching with stale-on-error, Wowbrary feed-quirk handling, Evergreen hi-res cover resolution
 

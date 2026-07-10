@@ -51,13 +51,36 @@
 	aspect-ratio: 2 / 3;
 	background: var(--chm-cream-deep);
 	flex-shrink: 0;
+	overflow: hidden;
 }
 
-.chm-rss-card__img {
+/*
+ * Both the parent qualifier and the absolute inset are load-bearing:
+ * theme resets like `.elementor img { height: auto }` out-rank a lone
+ * class selector, which left the image at its natural aspect inside
+ * the 2:3 frame. Absolute + inset:0 fills the frame even under
+ * height:auto.
+ */
+.chm-rss-card__media .chm-rss-card__img {
+	position: absolute;
+	inset: 0;
 	display: block;
 	width: 100%;
 	height: 100%;
-	object-fit: cover;
+	object-fit: contain;
+	z-index: 1;
+}
+
+/* Blurred echo of the cover fills the frame behind odd-shaped art
+   (square CD covers, landscape audio thumbs) so every card reads
+   as a full 2:3 tile instead of a letterboxed thumbnail. */
+.chm-rss-card__backdrop {
+	position: absolute;
+	inset: -16px;
+	background-size: cover;
+	background-position: center;
+	filter: blur(14px) saturate(1.15);
+	opacity: 0.9;
 }
 
 /* Missing cover — striped cream placeholder, palette only. */

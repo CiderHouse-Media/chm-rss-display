@@ -3,7 +3,7 @@
  * Plugin Name:       CHM RSS Display
  * Plugin URI:        https://github.com/CiderHouse-Media/chm-rss-display
  * Description:       Elementor widget that displays an external RSS feed (Wowbrary / CW Mars) as a carousel, grid, or list. Display only — never imports posts.
- * Version:           1.0.0
+ * Version:           1.0.1
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Cider House Media
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CHM_RSS_VERSION', '1.0.0' );
+define( 'CHM_RSS_VERSION', '1.0.1' );
 define( 'CHM_RSS_FILE', __FILE__ );
 define( 'CHM_RSS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'CHM_RSS_URL', plugin_dir_url( __FILE__ ) );
