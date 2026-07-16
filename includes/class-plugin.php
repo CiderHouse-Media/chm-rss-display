@@ -27,50 +27,18 @@ final class Plugin {
 	private function __construct() {
 		add_action( 'elementor/widgets/register', [ $this, 'register_widgets' ] );
 		add_action( 'elementor/elements/categories_registered', [ $this, 'register_category' ] );
-		add_action( 'wp_enqueue_scripts', [ $this, 'register_assets' ] );
+
+		// Register after Elementor registers its own assets so the 'swiper'
+		// handles exist — hooking plain wp_enqueue_scripts races Elementor
+		// and can silently drop the Swiper dependency on the frontend.
+		add_action( 'elementor/frontend/after_register_scripts', [ $this, 'register_assets' ] );
+		add_action( 'elementor/frontend/after_register_styles', [ $this, 'register_assets' ] );
 
 		// The editor preview iframe also needs the frontend assets registered.
 		add_action( 'elementor/preview/enqueue_styles', [ $this, 'register_assets' ] );
 
-		// Admin-bar "Refresh RSS Feed" — forces a fresh fetch on demand.
-		add_action( 'admin_bar_menu', [ $this, 'add_refresh_node' ], 90 );
-		add_action( 'template_redirect', [ $this, 'maybe_flush_cache' ] );
-	}
-
-	/**
-	 * Front-end admin-bar node that flushes the feed cache.
-	 *
-	 * @param \WP_Admin_Bar $bar Admin bar instance.
-	 */
-	public function add_refresh_node( $bar ) {
-		if ( is_admin() || ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-		$bar->add_node(
-			[
-				'id'    => 'chm-rss-refresh',
-				'title' => esc_html__( 'Refresh RSS Feed', 'chm-rss-display' ),
-				'href'  => wp_nonce_url( add_query_arg( 'chm_rss_flush', '1' ), 'chm_rss_flush' ),
-				'meta'  => [
-					'title' => esc_attr__( 'Clear the cached feed and refetch it now', 'chm-rss-display' ),
-				],
-			]
-		);
-	}
-
-	/**
-	 * Handle the admin-bar flush action, then reload the page clean.
-	 */
-	public function maybe_flush_cache() {
-		if ( ! isset( $_GET['chm_rss_flush'] ) || ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-		check_admin_referer( 'chm_rss_flush' );
-
-		Feed_Fetcher::flush();
-
-		wp_safe_redirect( remove_query_arg( [ 'chm_rss_flush', '_wpnonce' ] ) );
-		exit;
+		// Safety net for contexts where the Elementor hooks don't fire.
+		add_action( 'wp_enqueue_scripts', [ $this, 'register_assets' ], 20 );
 	}
 
 	/**
@@ -99,30 +67,32 @@ final class Plugin {
 	}
 
 	/**
-	 * Register (not enqueue) widget assets. Elementor loads them
-	 * on demand via get_style_depends() / get_script_depends().
+	 * Register (not enqueue) widget assets. Elementor loads them on demand
+	 * via get_style_depends() / get_script_depends(). Idempotent — this is
+	 * hooked in several places to cover frontend, editor, and fallbacks.
 	 */
 	public function register_assets() {
-		wp_register_style(
-			'chm-rss-widget',
-			CHM_RSS_URL . 'assets/css/chm-rss-widget.css',
-			[],
-			CHM_RSS_VERSION
-		);
-
-		// Depend on Elementor's bundled Swiper; fall back gracefully if the
-		// handle is absent (very old Elementor) — the JS also guards at runtime.
-		$deps = [ 'jquery' ];
-		if ( wp_script_is( 'swiper', 'registered' ) ) {
-			$deps[] = 'swiper';
+		if ( ! wp_style_is( 'chm-rss-widget', 'registered' ) ) {
+			wp_register_style(
+				'chm-rss-widget',
+				CHM_RSS_URL . 'assets/css/chm-rss-widget.css',
+				[],
+				CHM_RSS_VERSION
+			);
 		}
 
-		wp_register_script(
-			'chm-rss-widget',
-			CHM_RSS_URL . 'assets/js/chm-rss-widget.js',
-			$deps,
-			CHM_RSS_VERSION,
-			true
-		);
+		if ( ! wp_script_is( 'chm-rss-widget', 'registered' ) ) {
+			// Deliberately NOT listing 'swiper' as a hard dependency: an
+			// unmet script dep silently blocks the whole script. Load order
+			// is guaranteed by the widget's get_script_depends() instead,
+			// and the JS degrades gracefully if Swiper is absent.
+			wp_register_script(
+				'chm-rss-widget',
+				CHM_RSS_URL . 'assets/js/chm-rss-widget.js',
+				[ 'jquery' ],
+				CHM_RSS_VERSION,
+				true
+			);
+		}
 	}
 }

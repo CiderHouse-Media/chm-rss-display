@@ -21,21 +21,25 @@ class Feed_Fetcher {
 
 	const TRANSIENT_PREFIX = 'chm_rss_';
 	const STALE_PREFIX     = 'chm_rss_stale_';
-	const REGISTRY_OPTION  = 'chm_rss_cache_keys';
 	const DEFAULT_TTL      = 6 * HOUR_IN_SECONDS;
 	const EDITOR_TTL       = 60;
 
 	/**
 	 * Get parsed feed items, served from cache when possible.
 	 *
-	 * @param string $url Feed URL (https).
-	 * @param int    $ttl Cache TTL in seconds. 0/negative falls back to default.
+	 * @param string $url         Feed URL (https).
+	 * @param int    $ttl         Cache TTL in seconds. 0/negative falls back to default.
+	 * @param string $jacket_base Optional Evergreen jacket endpoint for hi-res covers ('' = disabled).
 	 * @return Feed_Item[] Possibly empty array. Never WP_Error — errors degrade to stale or [].
 	 */
-	public function get_items( $url, $ttl = 0 ) {
+	public function get_items( $url, $ttl = 0, $jacket_base = '' ) {
 		$url = esc_url_raw( trim( (string) $url ), [ 'https', 'http' ] );
 		if ( '' === $url ) {
 			return [];
+		}
+
+		if ( 'auto' !== $jacket_base ) {
+			$jacket_base = esc_url_raw( trim( (string) $jacket_base ), [ 'https' ] );
 		}
 
 		$ttl = (int) apply_filters( 'chm_rss_cache_ttl', $ttl > 0 ? $ttl : self::DEFAULT_TTL, $url );
@@ -45,9 +49,8 @@ class Feed_Fetcher {
 			$ttl = min( $ttl, self::EDITOR_TTL );
 		}
 
-		// Version-scoped: a plugin update invalidates cached parses, so a
-		// parser fix is never trapped behind a stale transient for hours.
-		$key    = md5( CHM_RSS_VERSION . '|' . $url );
+		// Version in the key: plugin updates always start from a fresh cache.
+		$key    = md5( $url . '|' . $jacket_base . '|' . CHM_RSS_VERSION );
 		$cached = get_transient( self::TRANSIENT_PREFIX . $key );
 
 		if ( is_array( $cached ) ) {
@@ -62,46 +65,37 @@ class Feed_Fetcher {
 			return is_array( $stale ) ? $this->hydrate( $stale ) : [];
 		}
 
+		return $this->build_and_cache( $key, $xml, $url, $jacket_base, $ttl );
+	}
+
+	/**
+	 * Parse XML, resolve covers, and store transient + stale copy + hash.
+	 * Shared by page-load refreshes and the hourly change-detection cron.
+	 *
+	 * @param string $key         Cache key.
+	 * @param string $xml         Raw feed XML.
+	 * @param string $url         Feed URL.
+	 * @param string $jacket_base Jacket base ('' | 'auto' | URL).
+	 * @param int    $ttl         Cache TTL.
+	 * @return Feed_Item[]
+	 */
+	protected function build_and_cache( $key, $xml, $url, $jacket_base, $ttl ) {
 		$items = $this->parse( $xml );
-		$items = $this->resolve_hires_images( $items );
+
+		if ( 'auto' === $jacket_base ) {
+			$jacket_base = $this->discover_jacket_base( $items, $url );
+		}
+
+		$items = $this->resolve_hires_images( $items, $jacket_base );
 		$raw   = array_map( 'get_object_vars', $items );
 
-		set_transient( self::TRANSIENT_PREFIX . $key, $raw, $ttl );
-		$this->remember_key( $key );
+		set_transient( self::TRANSIENT_PREFIX . $key, $raw, $ttl > 0 ? $ttl : self::DEFAULT_TTL );
 
 		if ( ! empty( $raw ) ) {
 			update_option( self::STALE_PREFIX . $key, $raw, false ); // autoload: no.
 		}
 
 		return $items;
-	}
-
-	/**
-	 * Delete every cached feed (transients + stale copies).
-	 * Backs the admin-bar "Refresh RSS Feed" action.
-	 */
-	public static function flush() {
-		$keys = get_option( self::REGISTRY_OPTION, [] );
-		foreach ( array_filter( (array) $keys, 'is_string' ) as $key ) {
-			delete_transient( self::TRANSIENT_PREFIX . $key );
-			delete_option( self::STALE_PREFIX . $key );
-		}
-		delete_option( self::REGISTRY_OPTION );
-	}
-
-	/**
-	 * Track active cache keys so flush() works on external object caches
-	 * (Redis/Memcached), where transients never appear in wp_options.
-	 *
-	 * @param string $key Cache key.
-	 */
-	protected function remember_key( $key ) {
-		$keys = get_option( self::REGISTRY_OPTION, [] );
-		$keys = is_array( $keys ) ? $keys : [];
-		if ( ! in_array( $key, $keys, true ) ) {
-			$keys[] = $key;
-			update_option( self::REGISTRY_OPTION, $keys, false );
-		}
 	}
 
 	/**
@@ -172,21 +166,7 @@ class Feed_Fetcher {
 				continue;
 			}
 
-			// The ISBN lives in the original Wowbrary link's i= param —
-			// extract it before clean_link() swaps in the direct URL.
-			$isbn = $this->extract_isbn( $link );
-			$link = $this->clean_link( $link );
-
-			// The feed embeds a "<span class='NUEITEM'>Downloadable Audio</span>"
-			// format chip inside the description. Drop it wholesale — otherwise
-			// tag-stripping later leaks its text into the blurb.
-			$raw_desc = preg_replace(
-				'#<span[^>]*NUEITEM[^>]*>.*?</span>#is',
-				'',
-				$this->node_text( $node, 'description' )
-			);
-
-			list( $author, $description ) = $this->split_author( $raw_desc );
+			list( $author, $description ) = $this->split_author( $this->node_text( $node, 'description' ) );
 
 			$items[] = new Feed_Item(
 				[
@@ -197,7 +177,7 @@ class Feed_Fetcher {
 					'image'       => $this->extract_image( $node ),
 					'timestamp'   => $this->parse_date( $this->node_text( $node, 'pubDate' ) ),
 					'category'    => sanitize_text_field( $this->node_text( $node, 'category' ) ),
-					'isbn'        => $isbn,
+					'isbn'        => $this->extract_isbn( $link ),
 				]
 			);
 		}
@@ -271,20 +251,7 @@ class Feed_Fetcher {
 	 */
 	protected function split_author( $description ) {
 		$description = trim( (string) $description );
-
-		// Find the first ". " that isn't part of an initial — "By H. M. Wolfe."
-		// must split after "Wolfe", not after "H".
-		$pos    = false;
-		$offset = 0;
-		while ( false !== ( $found = strpos( $description, '. ', $offset ) ) ) {
-			$last_word = preg_replace( '/^.*\s/s', '', substr( $description, 0, $found ) );
-			if ( preg_match( '/^[A-Z]$/', $last_word ) ) {
-				$offset = $found + 2;
-				continue;
-			}
-			$pos = $found;
-			break;
-		}
+		$pos         = strpos( $description, '. ' );
 
 		if ( false === $pos ) {
 			return [ '', $description ];
@@ -328,47 +295,6 @@ class Feed_Fetcher {
 	}
 
 	/**
-	 * Clean an outbound item link.
-	 *
-	 * Wowbrary links route through its l.aspx redirector with tracking-ish
-	 * params (u=, t=, rss). The c= param encodes the real destination:
-	 * numeric → Evergreen/VuFind catalog record, "WOV{n}" → OverDrive media.
-	 * Linking straight there drops the extra hop and params, and the
-	 * catalog sees this site as the traffic source. Unknown shapes keep
-	 * the (https-upgraded) original link.
-	 *
-	 * @param string $link Item link from the feed.
-	 * @return string
-	 */
-	protected function clean_link( $link ) {
-		// The feed emits plain http; every destination serves https.
-		$link = preg_replace( '#^http://#i', 'https://', (string) $link );
-
-		if ( ! apply_filters( 'chm_rss_direct_links', true ) || false === stripos( $link, 'wowbrary.org' ) ) {
-			return $link;
-		}
-
-		$query = wp_parse_url( $link, PHP_URL_QUERY );
-		if ( ! $query ) {
-			return $link;
-		}
-		parse_str( $query, $params );
-		$record = isset( $params['c'] ) ? (string) $params['c'] : '';
-
-		if ( '' !== $record && ctype_digit( $record ) ) {
-			$base = apply_filters( 'chm_rss_catalog_record_base', 'https://belchertwn.cwmars.org/Record/' );
-			return $base ? esc_url_raw( $base . $record, [ 'https' ] ) : $link;
-		}
-
-		if ( preg_match( '/^WOV(\d+)$/', $record, $m ) ) {
-			$base = apply_filters( 'chm_rss_econtent_base', 'https://cwmars.overdrive.com/media/' );
-			return $base ? esc_url_raw( $base . $m[1], [ 'https' ] ) : $link;
-		}
-
-		return $link;
-	}
-
-	/**
 	 * Extract the ISBN/EAN from a Wowbrary item link's i= query parameter.
 	 *
 	 * @param string $link Item link.
@@ -386,54 +312,222 @@ class Feed_Fetcher {
 	}
 
 	/**
-	 * Upgrade item images to the CW Mars (Evergreen) licensed cover jackets
-	 * where available. Wowbrary thumbnails are only 160px and blur when
-	 * rendered at card size; the consortium jacket service returns ~265×400.
+	 * Upgrade item images to licensed cover jackets from an Evergreen ILS
+	 * catalog, where configured. Feed thumbnails are often tiny (~160px)
+	 * and blur at card size; Evergreen jacket services return ~265×400.
 	 *
-	 * Cascade per item: CW Mars jacket by ISBN → original Wowbrary thumbnail.
-	 * Detection: the jacket endpoint answers 200 for a real cover and 404
-	 * (with a 1×1 blank) when it has none. HEAD requests keep this cheap.
+	 * DISABLED unless a jacket endpoint is explicitly configured on the
+	 * widget (or via the chm_rss_jacket_base filter) — the plugin never
+	 * contacts a third-party host the site owner didn't opt into.
+	 *
+	 * Cascade per item: jacket by ISBN → original feed thumbnail.
+	 * Detection: Evergreen answers 200 for a real cover and 404 (with a
+	 * 1×1 blank) when it has none. HEAD requests keep this cheap.
 	 *
 	 * Runs only on cache refresh, and under a total time budget so a slow
 	 * catalog can never stall a page load — unresolved items simply keep
 	 * their thumbnails until the next refresh.
 	 *
-	 * @param Feed_Item[] $items Parsed items.
+	 * @param Feed_Item[] $items       Parsed items.
+	 * @param string      $jacket_base Jacket endpoint base URL ('' = disabled).
 	 * @return Feed_Item[]
 	 */
-	protected function resolve_hires_images( array $items ) {
+	protected function resolve_hires_images( array $items, $jacket_base = '' ) {
 		if ( ! apply_filters( 'chm_rss_resolve_hires', true ) ) {
 			return $items;
 		}
 
-		$base = apply_filters(
-			'chm_rss_jacket_base',
-			'https://bark.cwmars.org/opac/extras/ac/jacket/large/'
-		);
-		if ( '' === $base ) {
+		$base = apply_filters( 'chm_rss_jacket_base', $jacket_base );
+		if ( ! is_string( $base ) || '' === trim( $base ) ) {
 			return $items;
 		}
+		$base = trailingslashit( trim( $base ) );
 
 		$budget  = (float) apply_filters( 'chm_rss_hires_time_budget', 8.0 );
 		$started = microtime( true );
+
+		// Persistent per-ISBN results so the time budget is only spent on
+		// unknown ISBNs. Hits are permanent; misses are re-checked weekly
+		// (catalogs add covers over time). Coverage therefore accumulates
+		// across refreshes even for 100+ item feeds.
+		$cache_key = self::STALE_PREFIX . 'jackets_' . md5( $base );
+		$cache     = get_option( $cache_key, [] );
+		if ( ! is_array( $cache ) ) {
+			$cache = [];
+		}
+		$dirty = false;
 
 		foreach ( $items as $item ) {
 			if ( '' === $item->isbn ) {
 				continue;
 			}
-			if ( ( microtime( true ) - $started ) > $budget ) {
-				break;
+
+			$jacket = $base . rawurlencode( $item->isbn );
+
+			if ( isset( $cache[ $item->isbn ] ) ) {
+				$entry = $cache[ $item->isbn ];
+				if ( ! empty( $entry['h'] ) ) {
+					$item->image = esc_url_raw( $jacket, [ 'https' ] );
+					continue;
+				}
+				if ( isset( $entry['t'] ) && ( time() - (int) $entry['t'] ) < WEEK_IN_SECONDS ) {
+					continue; // Recent miss — don't re-check yet.
+				}
 			}
 
-			$jacket   = $base . rawurlencode( $item->isbn );
-			$response = wp_safe_remote_head( $jacket, [ 'timeout' => 3 ] );
+			if ( ( microtime( true ) - $started ) > $budget ) {
+				continue; // Budget spent — unknown ISBNs wait for the next refresh.
+			}
 
-			if ( ! is_wp_error( $response ) && 200 === (int) wp_remote_retrieve_response_code( $response ) ) {
+			$response = wp_safe_remote_head( $jacket, [ 'timeout' => 3 ] );
+			if ( is_wp_error( $response ) ) {
+				continue; // Network error — leave unknown, retry next refresh.
+			}
+
+			$hit                   = ( 200 === (int) wp_remote_retrieve_response_code( $response ) );
+			$cache[ $item->isbn ] = [ 'h' => $hit ? 1 : 0, 't' => time() ];
+			$dirty                 = true;
+
+			if ( $hit ) {
 				$item->image = esc_url_raw( $jacket, [ 'https' ] );
 			}
 		}
 
+		if ( $dirty ) {
+			// Keep the newest ~400 entries so the option can't grow unbounded.
+			if ( count( $cache ) > 400 ) {
+				uasort( $cache, static function ( $a, $b ) {
+					return ( $b['t'] ?? 0 ) <=> ( $a['t'] ?? 0 );
+				} );
+				$cache = array_slice( $cache, 0, 400, true );
+			}
+			update_option( $cache_key, $cache, false ); // autoload: no.
+		}
+
 		return $items;
+	}
+
+	/**
+	 * Discover the library catalog's Evergreen jacket endpoint from the
+	 * feed's own item links (which redirect to the catalog).
+	 *
+	 * Process: follow up to 3 item links to their final host (skipping
+	 * OverDrive/e-content hosts), then probe {host}/opac/extras/ac/jacket/large/
+	 * with a known ISBN. 200 = Evergreen jacket service confirmed.
+	 *
+	 * The result — including failure — is cached per feed; failures are
+	 * retried weekly. Failure simply means feed images are used, so this
+	 * can never break the widget.
+	 *
+	 * @param Feed_Item[] $items    Parsed items.
+	 * @param string      $feed_url Feed URL (cache key).
+	 * @return string Jacket base URL, or '' when discovery failed.
+	 */
+	protected function discover_jacket_base( array $items, $feed_url ) {
+		$opt    = self::STALE_PREFIX . 'discovery_' . md5( $feed_url );
+		$cached = get_option( $opt );
+
+		if ( is_array( $cached ) && isset( $cached['base'] ) ) {
+			$fresh_failure = '' === $cached['base'] && ( time() - (int) ( $cached['t'] ?? 0 ) ) < WEEK_IN_SECONDS;
+			if ( '' !== $cached['base'] || $fresh_failure ) {
+				return (string) $cached['base'];
+			}
+		}
+
+		$isbn = '';
+		foreach ( $items as $item ) {
+			if ( '' !== $item->isbn ) {
+				$isbn = $item->isbn;
+				break;
+			}
+		}
+
+		$base = '';
+
+		if ( '' !== $isbn ) {
+			$tried = 0;
+			foreach ( $items as $item ) {
+				if ( '' === $item->link || $tried >= 3 ) {
+					continue;
+				}
+				$tried++;
+
+				$host_base = $this->resolve_final_base( $item->link );
+				if ( '' === $host_base || false !== stripos( $host_base, 'overdrive' ) ) {
+					continue;
+				}
+
+				$candidate = $host_base . 'opac/extras/ac/jacket/large/';
+				$response  = wp_safe_remote_head( $candidate . rawurlencode( $isbn ), [ 'timeout' => 4 ] );
+
+				if ( ! is_wp_error( $response ) && 200 === (int) wp_remote_retrieve_response_code( $response ) ) {
+					$base = $candidate;
+					break;
+				}
+			}
+		}
+
+		update_option( $opt, [ 'base' => $base, 't' => time() ], false );
+
+		return $base;
+	}
+
+	/**
+	 * Follow redirects manually (max 3 hops) and return the final
+	 * scheme://host/ of a URL, or '' on failure.
+	 *
+	 * @param string $url Starting URL.
+	 * @return string
+	 */
+	protected function resolve_final_base( $url ) {
+		for ( $hop = 0; $hop < 3; $hop++ ) {
+			$response = wp_safe_remote_get(
+				$url,
+				[
+					'timeout'     => 5,
+					'redirection' => 0,
+					'user-agent'  => apply_filters(
+						'chm_rss_user_agent',
+						'CHM-RSS-Display/' . CHM_RSS_VERSION . '; +' . home_url( '/' )
+					),
+				]
+			);
+
+			if ( is_wp_error( $response ) ) {
+				return '';
+			}
+
+			$code = (int) wp_remote_retrieve_response_code( $response );
+			if ( $code < 300 || $code >= 400 ) {
+				break;
+			}
+
+			$location = wp_remote_retrieve_header( $response, 'location' );
+			if ( is_array( $location ) ) {
+				$location = end( $location );
+			}
+			if ( ! $location ) {
+				return '';
+			}
+
+			// Resolve relative redirects against the current URL's host.
+			if ( 0 !== strpos( $location, 'http' ) ) {
+				$parts = wp_parse_url( $url );
+				if ( empty( $parts['host'] ) ) {
+					return '';
+				}
+				$location = ( $parts['scheme'] ?? 'https' ) . '://' . $parts['host'] . '/' . ltrim( $location, '/' );
+			}
+
+			$url = $location;
+		}
+
+		$parts = wp_parse_url( $url );
+		if ( empty( $parts['host'] ) ) {
+			return '';
+		}
+
+		return ( $parts['scheme'] ?? 'https' ) . '://' . $parts['host'] . '/';
 	}
 
 	/**

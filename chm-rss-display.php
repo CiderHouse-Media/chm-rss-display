@@ -2,14 +2,16 @@
 /**
  * Plugin Name:       CHM RSS Display
  * Plugin URI:        https://github.com/CiderHouse-Media/chm-rss-display
- * Description:       Elementor widget that displays an external RSS feed (Wowbrary / CW Mars) as a carousel, grid, or list. Display only — never imports posts.
- * Version:           1.0.2
- * Requires at least: 6.0
+ * Description:       Display an external RSS feed as a customizable carousel, grid, or list in Elementor. Optimized for Wowbrary library feeds. Display only — never imports posts.
+ * Version:           1.2.1
+ * Requires at least: 6.5
  * Requires PHP:      7.4
  * Author:            Cider House Media
  * Author URI:        https://ciderhouse.media
  * License:           GPL-2.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       chm-rss-display
+ * Requires Plugins:  elementor
  *
  * Elementor tested up to: 3.30
  */
@@ -18,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CHM_RSS_VERSION', '1.0.2' );
+define( 'CHM_RSS_VERSION', '1.2.1' );
 define( 'CHM_RSS_FILE', __FILE__ );
 define( 'CHM_RSS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'CHM_RSS_URL', plugin_dir_url( __FILE__ ) );
@@ -48,6 +50,13 @@ function chm_rss_display_boot() {
 	\ChmRss\Plugin::instance();
 }
 add_action( 'plugins_loaded', 'chm_rss_display_boot' );
+
+// One-time cleanup: remove the background refresh event a previous version scheduled.
+add_action( 'init', function () {
+	if ( wp_next_scheduled( 'chm_rss_refresh' ) ) {
+		wp_clear_scheduled_hook( 'chm_rss_refresh' );
+	}
+}, 99 );
 
 /**
  * Admin notice: Elementor not active.

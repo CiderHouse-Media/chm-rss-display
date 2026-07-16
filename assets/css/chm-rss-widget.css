@@ -54,34 +54,38 @@
 	overflow: hidden;
 }
 
-/*
- * Both the parent qualifier and the absolute inset are load-bearing:
- * theme resets like `.elementor img { height: auto }` out-rank a lone
- * class selector, which left the image at its natural aspect inside
- * the 2:3 frame. Absolute + inset:0 fills the frame even under
- * height:auto.
- */
-.chm-rss-card__media .chm-rss-card__img {
+/* Soft blurred echo of the cover fills the letterbox space. Same URL as
+   the <img>, so it costs zero extra requests. */
+.chm-rss-card__media-bg {
+	position: absolute;
+	inset: 0;
+	background-size: cover;
+	background-position: center;
+	filter: blur(16px) saturate(1.05);
+	transform: scale(1.2); /* push blur fringe outside the frame */
+	opacity: 0.8;
+}
+
+.chm-rss-card__img {
 	position: absolute;
 	inset: 0;
 	display: block;
 	width: 100%;
-	height: 100%;
+	/* !important: Elementor's own `.elementor img { height: auto }` rule
+	   otherwise wins the cascade and pins covers to the top of the frame. */
+	height: 100% !important;
 	object-fit: contain;
-	z-index: 1;
+	object-position: center;
 }
 
-/* Blurred echo of the cover fills the frame behind odd-shaped art
-   (square CD covers, landscape audio thumbs) so every card reads
-   as a full 2:3 tile instead of a letterboxed thumbnail. */
-.chm-rss-card__backdrop {
-	position: absolute;
-	inset: -16px;
-	background-size: cover;
-	background-position: center;
-	filter: blur(14px) saturate(1.15);
-	opacity: 0.9;
-}
+/* --- Image Fit modes (widget prefix class) --- */
+
+/* Crop to fill: classic full-bleed, no backdrop needed. */
+.chm-rss-imgfit-cover .chm-rss-card__img { object-fit: cover; }
+.chm-rss-imgfit-cover .chm-rss-card__media-bg { display: none; }
+
+/* Plain letterbox: contain over the flat cream base. */
+.chm-rss-imgfit-contain .chm-rss-card__media-bg { display: none; }
 
 /* Missing cover — striped cream placeholder, palette only. */
 .chm-rss-card__placeholder {
@@ -287,6 +291,30 @@
 	overflow: hidden;
 }
 
+/* Layout baseline that doesn't depend on Swiper's CSS being present. */
+.chm-rss__carousel .swiper-wrapper {
+	display: flex;
+}
+
+/* SAFETY NET: before Swiper initializes (or if it never loads), render as
+   a clean horizontal scroller — never a blank or vertically-stacked mess. */
+.chm-rss__carousel:not(.swiper-initialized):not(.swiper-container-initialized) {
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+	scroll-snap-type: x mandatory;
+}
+
+.chm-rss__carousel:not(.swiper-initialized):not(.swiper-container-initialized) .swiper-slide {
+	flex: 0 0 24%;
+	min-width: 220px;
+	margin-right: 24px;
+	scroll-snap-align: start;
+}
+
+.chm-rss__carousel:not(.swiper-initialized):not(.swiper-container-initialized) ~ .chm-rss__arrow {
+	display: none;
+}
+
 .chm-rss__carousel .swiper-slide {
 	height: auto;
 	display: flex;
@@ -360,6 +388,41 @@
 
 .chm-rss .swiper-pagination-bullet-active {
 	background: var(--chm-navy);
+}
+
+/* ---------------------------------------------------------- Load more */
+
+.chm-rss-card--hidden {
+	display: none !important;
+}
+
+.chm-rss__more-wrap {
+	text-align: center;
+	margin-top: 28px;
+}
+
+.chm-rss__more {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	background: var(--chm-navy);
+	color: #fff;
+	border: none;
+	border-radius: 4px;
+	padding: 11px 22px;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: background-color 0.18s ease;
+}
+
+.chm-rss__more:hover {
+	background: var(--chm-navy-dark);
+}
+
+.chm-rss__more:focus-visible {
+	outline: 2px solid var(--chm-navy);
+	outline-offset: 2px;
 }
 
 /* ----------------------------------------------------------- Editor UX */

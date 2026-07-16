@@ -108,11 +108,34 @@
 		}
 	}
 
+	function initLoadMore( scope ) {
+		var buttons = scope.querySelectorAll( '.chm-rss__more' );
+		for ( var i = 0; i < buttons.length; i++ ) {
+			(function ( btn ) {
+				btn.addEventListener( 'click', function () {
+					var root = btn.closest( '.chm-rss' );
+					if ( ! root ) {
+						return;
+					}
+					var hidden = root.querySelectorAll( '.chm-rss-card--hidden' );
+					var batch = parseInt( btn.getAttribute( 'data-batch' ), 10 ) || 12;
+					for ( var j = 0; j < hidden.length && j < batch; j++ ) {
+						hidden[ j ].classList.remove( 'chm-rss-card--hidden' );
+					}
+					if ( ! root.querySelector( '.chm-rss-card--hidden' ) ) {
+						btn.parentNode.style.display = 'none';
+					}
+				} );
+			})( buttons[ i ] );
+		}
+	}
+
 	function initScope( scope ) {
 		var carousels = scope.querySelectorAll( '.chm-rss__carousel' );
 		for ( var i = 0; i < carousels.length; i++ ) {
 			initCarousel( carousels[ i ] );
 		}
+		initLoadMore( scope );
 	}
 
 	// Elementor context (frontend + editor live preview).

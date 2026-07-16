@@ -6,7 +6,7 @@ A WordPress plugin by [Cider House Media](https://ciderhouse.media) that adds an
 
 - **Three views:** Carousel (Swiper, using Elementor's bundled library), Grid, and List — all responsive
 - **Full Elementor styling:** native Group Controls for typography, colors, backgrounds, borders, shadows, spacing on every card element (card, image, category label, title, author, description, date, CTA, carousel navigation)
-- **Smart cover images:** upgrades low-resolution feed thumbnails (160px) to licensed hi-res covers (~265×400) from the Evergreen catalog jacket service by ISBN, with automatic fallback to the original thumbnail
+- **Optional hi-res covers:** enter your Evergreen ILS catalog's jacket endpoint in the widget to upgrade low-resolution feed thumbnails (160px) to licensed hi-res covers (~265×400) by ISBN, with automatic fallback to the original thumbnail (off by default)
 - **Resilient caching:** transient-based (1/6/12/24h, configurable per widget) with a stale-on-error fallback — a feed outage never breaks the page
 - **Feed-quirk handling** for Wowbrary RSS:
   - UTF-8 BOM before the XML declaration
@@ -37,6 +37,17 @@ A WordPress plugin by [Cider House Media](https://ciderhouse.media) that adds an
 
 Cards link to the item's catalog page (CW Mars borrow link), opening in a new tab by default.
 
+## Hi-res covers
+
+Feed thumbnails are often tiny (~160px) and look soft at card size. The widget's **Cover Image Quality** setting can upgrade them using your library catalog's cover service (Evergreen ILS):
+
+- **Standard** — feed images only, no external calls (default)
+- **Enhanced — find my library catalog automatically** — the plugin follows one feed link to your catalog and checks whether it serves covers. If it can't (some catalogs block automated requests), it silently falls back to Standard. Nothing breaks.
+- **Enhanced — C/W MARS (Massachusetts)** — preset for C/W MARS member libraries
+- **Enhanced — custom catalog URL** — enter your Evergreen jacket endpoint directly. It's usually your catalog address + `/opac/extras/ac/jacket/large/` — for example `https://catalog.example.org/opac/extras/ac/jacket/large/`. Your consortium's IT contact will know it. Test it in a browser by appending an ISBN; a cover image should load.
+
+In Enhanced modes, your server sends only item ISBNs to the catalog, once per cache refresh. Results are remembered per ISBN, so lookups taper to zero after the first day. More presets can be added via the `chm_rss_jacket_presets` filter.
+
 ## Filters
 
 | Filter | Default | Purpose |
@@ -44,11 +55,9 @@ Cards link to the item's catalog page (CW Mars borrow link), opening in a new ta
 | `chm_rss_cache_ttl` | widget setting / 6h | Cache lifetime in seconds |
 | `chm_rss_user_agent` | `CHM-RSS-Display/{ver}; +site-url` | UA sent to the feed host |
 | `chm_rss_resolve_hires` | `true` | Enable/disable hi-res cover lookup |
-| `chm_rss_jacket_base` | `https://bark.cwmars.org/opac/extras/ac/jacket/large/` | Evergreen jacket endpoint (swap for another consortium) |
+| `chm_rss_jacket_base` | widget setting | Override the resolved jacket endpoint globally |
+| `chm_rss_jacket_presets` | `['cwmars' => …]` | Add consortium presets to the Cover Image Quality dropdown |
 | `chm_rss_hires_time_budget` | `8.0` | Max seconds spent on cover lookups per cache refresh |
-| `chm_rss_direct_links` | `true` | Link straight to the catalog/OverDrive instead of through Wowbrary's redirector |
-| `chm_rss_catalog_record_base` | `https://belchertwn.cwmars.org/Record/` | Catalog record URL base for physical items |
-| `chm_rss_econtent_base` | `https://cwmars.overdrive.com/media/` | OverDrive URL base for e-content items |
 
 ## Architecture
 
@@ -72,26 +81,27 @@ chm-rss-display/
 ## Notes & known limitations
 
 - Hi-res covers resolve for ISBNs present in the consortium's cover provider (typically physical books). Downloadable audio, e-books, and music items usually keep the feed's thumbnail.
-- The default jacket host is an Evergreen "brick" hostname; if the consortium renames it, point `chm_rss_jacket_base` at the new host.
+- Hi-res covers require an Evergreen jacket endpoint configured on the widget (e.g. a CW Mars "brick" host like `https://bark.cwmars.org/opac/extras/ac/jacket/large/`). If the consortium renames the host, update the widget setting.
 - If the site runs a page cache (e.g. WP Rocket), new feed items appear after page-cache expiry/purge, not the moment the transient refreshes.
 
 ## Changelog
 
-### 1.0.2
-- New: "Refresh RSS Feed" admin-bar button (front end, admins only) — clears the cached feed and refetches on the spot
-- New: version-scoped cache keys — plugin updates automatically invalidate data parsed by the previous version
-- New: outbound links go directly to the destination (CW Mars catalog record for physical items, OverDrive for e-content) instead of through Wowbrary's `l.aspx` redirector; filterable via `chm_rss_direct_links`, `chm_rss_catalog_record_base`, `chm_rss_econtent_base`
-- Change: card links send an origin-only referrer (`referrerpolicy="strict-origin-when-cross-origin"`, `noreferrer` dropped) so the catalog sees the library site as the traffic source
+### 1.2.1
+- Removed the background feed-refresh cron (server-load risk, little benefit for weekly feeds); freshness = Cache Duration setting
 
-### 1.0.1
-- Fix: covers no longer collapse to natural aspect under theme `img { height: auto }` resets (e.g. Hello Elementor) — the image reliably fills its 2:3 frame
-- Fix: authors with initials ("H. M. Wolfe") no longer truncate to the first initial when split from the description
-- Fix: the feed's embedded format chip ("Downloadable Audio") no longer leaks into description text
-- New: odd-shaped art (square CDs, landscape audio thumbnails) displays full-size over a blurred echo of the cover instead of letterboxing or cropping
-- New: "Image Fit" style control (Fit — full cover / Fill — crop to frame)
+### 1.2.0
+- Load More batching for Grid/List (deferred image loading), dots spacing/alignment controls, description length to 300 words, hardened image centering
+
+### 1.1.0
+- Cover Image Quality (auto-detect / C/W MARS preset / custom), Image Fit with blurred-backdrop default, per-ISBN lookup cache, 120-item cap
+- Fixed Swiper asset registration race (carousel broken on frontend, fine in editor); no-Swiper horizontal-scroll fallback; proper cache-busting on updates
 
 ### 1.0.0
 - Initial release: carousel/grid/list views, full Elementor style controls, transient caching with stale-on-error, Wowbrary feed-quirk handling, Evergreen hi-res cover resolution
+
+## WordPress.org
+
+The plugin ships with a directory-compliant `readme.txt` (including the required External Services disclosure), `uninstall.php` cleanup, `Requires Plugins: elementor` dependency header, and a `.distignore` for building the distribution zip.
 
 ## License
 

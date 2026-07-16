@@ -40,11 +40,13 @@ class Rss_Feed_Widget extends Widget_Base {
 	}
 
 	public function get_style_depends(): array {
-		return [ 'chm-rss-widget' ];
+		// 'swiper' / 'e-swiper' are Elementor's bundled Swiper CSS handles
+		// (name varies by version). Unregistered handles no-op harmlessly.
+		return [ 'swiper', 'e-swiper', 'chm-rss-widget' ];
 	}
 
 	public function get_script_depends(): array {
-		return [ 'chm-rss-widget' ];
+		return [ 'swiper', 'chm-rss-widget' ];
 	}
 
 	protected function is_dynamic_content(): bool {
@@ -89,10 +91,11 @@ class Rss_Feed_Widget extends Widget_Base {
 		$this->add_control(
 			'items_count',
 			[
-				'label'   => esc_html__( 'Items to Show', 'chm-rss-display' ),
-				'type'    => Controls_Manager::SLIDER,
-				'range'   => [ 'px' => [ 'min' => 1, 'max' => 20 ] ],
-				'default' => [ 'size' => 10 ],
+				'label'       => esc_html__( 'Items to Show', 'chm-rss-display' ),
+				'type'        => Controls_Manager::SLIDER,
+				'range'       => [ 'px' => [ 'min' => 1, 'max' => 120 ] ],
+				'default'     => [ 'size' => 10 ],
+				'description' => esc_html__( 'Curated feeds typically carry ~20 items; "all items" feeds can carry 100+.', 'chm-rss-display' ),
 			]
 		);
 
@@ -117,7 +120,39 @@ class Rss_Feed_Widget extends Widget_Base {
 				'label'       => esc_html__( 'Open Links in New Tab', 'chm-rss-display' ),
 				'type'        => Controls_Manager::SWITCHER,
 				'default'     => 'yes',
-				'description' => esc_html__( 'Items link off-site to the library catalog (CW Mars).', 'chm-rss-display' ),
+				'description' => esc_html__( 'Feed items link off-site to their source (e.g. your library catalog).', 'chm-rss-display' ),
+			]
+		);
+
+		$this->add_control(
+			'cover_source',
+			[
+				'label'       => esc_html__( 'Cover Image Quality', 'chm-rss-display' ),
+				'type'        => Controls_Manager::SELECT,
+				'default'     => 'feed',
+				'options'     => [
+					'feed'   => esc_html__( 'Standard — images from the feed', 'chm-rss-display' ),
+					'auto'   => esc_html__( 'Enhanced — find my library catalog automatically', 'chm-rss-display' ),
+					'cwmars' => esc_html__( 'Enhanced — C/W MARS (Massachusetts)', 'chm-rss-display' ),
+					'custom' => esc_html__( 'Enhanced — custom catalog URL', 'chm-rss-display' ),
+				],
+				'description' => esc_html__( 'Enhanced fetches larger, sharper cover images from your library catalog (Evergreen systems). Not sure? Try "find automatically" — if your catalog can\'t provide covers, the feed\'s own images are used and nothing breaks. Enhanced modes contact your library catalog from your server (ISBNs only).', 'chm-rss-display' ),
+			]
+		);
+
+		$this->add_control(
+			'jacket_base',
+			[
+				'label'       => esc_html__( 'Catalog Cover URL', 'chm-rss-display' ),
+				'type'        => Controls_Manager::TEXT,
+				'label_block' => true,
+				'placeholder' => 'https://catalog.example.org/opac/extras/ac/jacket/large/',
+				'condition'   => [ 'cover_source' => 'custom' ],
+				'description' => sprintf(
+					/* translators: %s: documentation URL */
+					esc_html__( 'Your Evergreen catalog\'s jacket endpoint — usually your catalog address followed by /opac/extras/ac/jacket/large/. Ask your consortium\'s IT contact, or see setup help: %s', 'chm-rss-display' ),
+					'https://github.com/CiderHouse-Media/chm-rss-display#hi-res-covers'
+				),
 			]
 		);
 
@@ -174,6 +209,39 @@ class Rss_Feed_Widget extends Widget_Base {
 					'{{WRAPPER}} .chm-rss__grid' => 'gap: {{SIZE}}{{UNIT}};',
 					'{{WRAPPER}} .chm-rss__list' => 'gap: {{SIZE}}{{UNIT}};',
 				],
+			]
+		);
+
+		$this->add_control(
+			'load_more',
+			[
+				'label'     => esc_html__( 'Load More Button', 'chm-rss-display' ),
+				'type'      => Controls_Manager::SWITCHER,
+				'default'   => '',
+				'condition' => [ 'view' => [ 'grid', 'list' ] ],
+				'description' => esc_html__( 'Show items in batches instead of all at once. Hidden items don\'t load their images until revealed.', 'chm-rss-display' ),
+			]
+		);
+
+		$this->add_control(
+			'per_page',
+			[
+				'label'     => esc_html__( 'Items per Batch', 'chm-rss-display' ),
+				'type'      => Controls_Manager::NUMBER,
+				'default'   => 12,
+				'min'       => 2,
+				'max'       => 60,
+				'condition' => [ 'view' => [ 'grid', 'list' ], 'load_more' => 'yes' ],
+			]
+		);
+
+		$this->add_control(
+			'load_more_text',
+			[
+				'label'     => esc_html__( 'Button Text', 'chm-rss-display' ),
+				'type'      => Controls_Manager::TEXT,
+				'default'   => esc_html__( 'Load More', 'chm-rss-display' ),
+				'condition' => [ 'view' => [ 'grid', 'list' ], 'load_more' => 'yes' ],
 			]
 		);
 
@@ -261,7 +329,8 @@ class Rss_Feed_Widget extends Widget_Base {
 				'type'      => Controls_Manager::NUMBER,
 				'default'   => 25,
 				'min'       => 5,
-				'max'       => 100,
+				'max'       => 300,
+				'description' => esc_html__( 'Set high (e.g. 300) to show full descriptions — useful in List view.', 'chm-rss-display' ),
 				'condition' => [ 'show_description' => 'yes' ],
 			]
 		);
@@ -569,6 +638,22 @@ class Rss_Feed_Widget extends Widget_Base {
 		);
 
 		$this->add_control(
+			'image_fit',
+			[
+				'label'        => esc_html__( 'Image Fit', 'chm-rss-display' ),
+				'type'         => Controls_Manager::SELECT,
+				'default'      => 'blur',
+				'options'      => [
+					'blur'    => esc_html__( 'Centered with blurred backdrop', 'chm-rss-display' ),
+					'cover'   => esc_html__( 'Crop to fill', 'chm-rss-display' ),
+					'contain' => esc_html__( 'Plain letterbox', 'chm-rss-display' ),
+				],
+				'description'  => esc_html__( 'How covers that don\'t match the aspect ratio (games, music, square art) are displayed. Book covers fill the frame in every mode.', 'chm-rss-display' ),
+				'prefix_class' => 'chm-rss-imgfit-',
+			]
+		);
+
+		$this->add_control(
 			'image_ratio',
 			[
 				'label'   => esc_html__( 'Aspect Ratio', 'chm-rss-display' ),
@@ -582,23 +667,6 @@ class Rss_Feed_Widget extends Widget_Base {
 				],
 				'selectors' => [
 					'{{WRAPPER}} .chm-rss-card__media' => 'aspect-ratio: {{VALUE}};',
-				],
-			]
-		);
-
-		$this->add_control(
-			'image_fit',
-			[
-				'label'       => esc_html__( 'Image Fit', 'chm-rss-display' ),
-				'type'        => Controls_Manager::SELECT,
-				'default'     => 'contain',
-				'options'     => [
-					'contain' => esc_html__( 'Fit — show the full cover', 'chm-rss-display' ),
-					'cover'   => esc_html__( 'Fill — crop to the frame', 'chm-rss-display' ),
-				],
-				'description' => esc_html__( 'Fit shows odd-shaped art (CDs, audio) over a blurred backdrop; Fill crops it to the frame.', 'chm-rss-display' ),
-				'selectors'   => [
-					'{{WRAPPER}} .chm-rss-card__media .chm-rss-card__img' => 'object-fit: {{VALUE}};',
 				],
 			]
 		);
@@ -973,6 +1041,48 @@ class Rss_Feed_Widget extends Widget_Base {
 		);
 
 		$this->add_responsive_control(
+			'dots_gap',
+			[
+				'label'      => esc_html__( 'Dot Spacing', 'chm-rss-display' ),
+				'type'       => Controls_Manager::SLIDER,
+				'size_units' => [ 'px' ],
+				'range'      => [ 'px' => [ 'min' => 0, 'max' => 40 ] ],
+				'default'    => [ 'size' => 8 ],
+				'condition'  => [ 'show_dots' => 'yes' ],
+				'selectors'  => [ '{{WRAPPER}} .chm-rss__dots' => 'gap: {{SIZE}}{{UNIT}};' ],
+			]
+		);
+
+		$this->add_responsive_control(
+			'dots_top_spacing',
+			[
+				'label'      => esc_html__( 'Space Above Dots', 'chm-rss-display' ),
+				'type'       => Controls_Manager::SLIDER,
+				'size_units' => [ 'px' ],
+				'range'      => [ 'px' => [ 'min' => 0, 'max' => 80 ] ],
+				'default'    => [ 'size' => 14 ],
+				'condition'  => [ 'show_dots' => 'yes' ],
+				'selectors'  => [ '{{WRAPPER}} .chm-rss__dots' => 'margin-top: {{SIZE}}{{UNIT}};' ],
+			]
+		);
+
+		$this->add_responsive_control(
+			'dots_align',
+			[
+				'label'     => esc_html__( 'Dots Alignment', 'chm-rss-display' ),
+				'type'      => Controls_Manager::CHOOSE,
+				'default'   => 'center',
+				'options'   => [
+					'flex-start' => [ 'title' => esc_html__( 'Left', 'chm-rss-display' ), 'icon' => 'eicon-h-align-left' ],
+					'center'     => [ 'title' => esc_html__( 'Center', 'chm-rss-display' ), 'icon' => 'eicon-h-align-center' ],
+					'flex-end'   => [ 'title' => esc_html__( 'Right', 'chm-rss-display' ), 'icon' => 'eicon-h-align-right' ],
+				],
+				'condition' => [ 'show_dots' => 'yes' ],
+				'selectors' => [ '{{WRAPPER}} .chm-rss__dots' => 'justify-content: {{VALUE}};' ],
+			]
+		);
+
+		$this->add_responsive_control(
 			'dot_size',
 			[
 				'label'      => esc_html__( 'Dot Size', 'chm-rss-display' ),
@@ -1007,7 +1117,7 @@ class Rss_Feed_Widget extends Widget_Base {
 		}
 
 		$fetcher = new Feed_Fetcher();
-		$items   = $fetcher->get_items( $feed_url, (int) $settings['cache_ttl'] );
+		$items   = $fetcher->get_items( $feed_url, (int) $settings['cache_ttl'], $this->get_jacket_base( $settings ) );
 
 		if ( empty( $items ) ) {
 			if ( $editor ) {
@@ -1048,11 +1158,13 @@ class Rss_Feed_Widget extends Widget_Base {
 	 * @param array                $settings Widget settings.
 	 */
 	private function render_grid( array $items, array $settings ): void {
+		$visible = $this->visible_count( $items, $settings );
 		echo '<div class="chm-rss__grid">';
-		foreach ( $items as $item ) {
-			$this->render_card( $item, $settings, 'card' );
+		foreach ( $items as $i => $item ) {
+			$this->render_card( $item, $settings, 'card', $i >= $visible );
 		}
 		echo '</div>';
+		$this->render_load_more( count( $items ), $visible, $settings );
 	}
 
 	/**
@@ -1060,11 +1172,46 @@ class Rss_Feed_Widget extends Widget_Base {
 	 * @param array                $settings Widget settings.
 	 */
 	private function render_list( array $items, array $settings ): void {
+		$visible = $this->visible_count( $items, $settings );
 		echo '<div class="chm-rss__list">';
-		foreach ( $items as $item ) {
-			$this->render_card( $item, $settings, 'row' );
+		foreach ( $items as $i => $item ) {
+			$this->render_card( $item, $settings, 'row', $i >= $visible );
 		}
 		echo '</div>';
+		$this->render_load_more( count( $items ), $visible, $settings );
+	}
+
+	/**
+	 * How many items are initially visible for the current settings.
+	 *
+	 * @param array $items    Items.
+	 * @param array $settings Widget settings.
+	 * @return int
+	 */
+	private function visible_count( array $items, array $settings ): int {
+		if ( 'yes' !== ( $settings['load_more'] ?? '' ) ) {
+			return count( $items );
+		}
+		$per = ! empty( $settings['per_page'] ) ? (int) $settings['per_page'] : 12;
+		return max( 1, min( $per, count( $items ) ) );
+	}
+
+	/**
+	 * Render the Load More button when there are hidden items.
+	 *
+	 * @param int   $total    Total items rendered.
+	 * @param int   $visible  Initially visible items.
+	 * @param array $settings Widget settings.
+	 */
+	private function render_load_more( int $total, int $visible, array $settings ): void {
+		if ( 'yes' !== ( $settings['load_more'] ?? '' ) || $total <= $visible ) {
+			return;
+		}
+		printf(
+			'<div class="chm-rss__more-wrap"><button type="button" class="chm-rss__more" data-batch="%d">%s</button></div>',
+			(int) ( ! empty( $settings['per_page'] ) ? $settings['per_page'] : 12 ),
+			esc_html( $settings['load_more_text'] ?: __( 'Load More', 'chm-rss-display' ) )
+		);
 	}
 
 	/**
@@ -1138,7 +1285,7 @@ class Rss_Feed_Widget extends Widget_Base {
 	 * @param array              $settings Widget settings.
 	 * @param string             $context  'card' or 'row'.
 	 */
-	private function render_card( $item, array $settings, string $context ): void {
+	private function render_card( $item, array $settings, string $context, bool $hidden = false ): void {
 		$new_tab   = 'yes' === $settings['new_tab'];
 		$title_tag = in_array( $settings['title_tag'], [ 'h2', 'h3', 'h4', 'h5', 'h6', 'div' ], true ) ? $settings['title_tag'] : 'h3';
 
@@ -1146,15 +1293,15 @@ class Rss_Feed_Widget extends Widget_Base {
 		if ( 'row' === $context ) {
 			$classes[] = 'chm-rss-card--row';
 		}
+		if ( $hidden ) {
+			$classes[] = 'chm-rss-card--hidden';
+		}
 
-		// noopener without noreferrer + an origin-only referrer policy:
-		// the catalog/OverDrive should see this site as the traffic source,
-		// but never the full page path.
 		printf(
-			'<a class="%1$s" href="%2$s" referrerpolicy="strict-origin-when-cross-origin"%3$s>',
+			'<a class="%1$s" href="%2$s"%3$s>',
 			esc_attr( implode( ' ', $classes ) ),
 			esc_url( $item->link ),
-			$new_tab ? ' target="_blank" rel="noopener"' : ''
+			$new_tab ? ' target="_blank" rel="noopener noreferrer"' : ''
 		);
 
 		// Media.
@@ -1162,7 +1309,11 @@ class Rss_Feed_Widget extends Widget_Base {
 			echo '<div class="chm-rss-card__media">';
 			if ( $item->has_image() ) {
 				printf(
-					'<span class="chm-rss-card__backdrop" style="background-image:url(%1$s)" aria-hidden="true"></span><img class="chm-rss-card__img" src="%1$s" alt="%2$s" loading="lazy" decoding="async">',
+					'<span class="chm-rss-card__media-bg" style="background-image:url(%s)" aria-hidden="true"></span>',
+					esc_url( $item->image )
+				);
+				printf(
+					'<img class="chm-rss-card__img" src="%s" alt="%s" loading="lazy" decoding="async">',
 					esc_url( $item->image ),
 					esc_attr( $item->title )
 				);
@@ -1224,6 +1375,35 @@ class Rss_Feed_Widget extends Widget_Base {
 	 */
 	private function render_placeholder( string $message ): void {
 		echo '<div class="chm-rss__placeholder">' . esc_html( $message ) . '</div>';
+	}
+
+	/**
+	 * Map the Cover Image Quality setting to a jacket base for the fetcher.
+	 *
+	 * @param array $settings Widget settings.
+	 * @return string '' = feed images only, 'auto' = discover from feed, else a base URL.
+	 */
+	private function get_jacket_base( array $settings ): string {
+		$source = isset( $settings['cover_source'] ) ? (string) $settings['cover_source'] : 'feed';
+
+		if ( 'feed' === $source ) {
+			return '';
+		}
+		if ( 'auto' === $source ) {
+			return 'auto';
+		}
+		if ( 'custom' === $source ) {
+			return (string) $settings['jacket_base'];
+		}
+
+		$presets = apply_filters(
+			'chm_rss_jacket_presets',
+			[
+				'cwmars' => 'https://bark.cwmars.org/opac/extras/ac/jacket/large/',
+			]
+		);
+
+		return isset( $presets[ $source ] ) ? (string) $presets[ $source ] : '';
 	}
 
 	/**

@@ -1,0 +1,9 @@
+# Files excluded from the WordPress.org distribution zip
+.git
+.gitignore
+.distignore
+README.md
+CLAUDE.md
+*.zip
+node_modules
+vendor
