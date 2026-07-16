@@ -251,24 +251,52 @@ class Feed_Fetcher {
 	 */
 	protected function split_author( $description ) {
 		$description = trim( (string) $description );
-		$pos         = strpos( $description, '. ' );
 
-		if ( false === $pos ) {
-			return [ '', $description ];
+		// The feed sometimes prefixes items with "By Author Name". Strip it
+		// before scanning so it doesn't count against the name-length caps,
+		// but keep $description intact for the no-author return.
+		$scan = preg_replace( '/^by\s+/i', '', $description );
+
+		$fallback = null; // Last name-shaped candidate, if scanning overruns.
+		$offset   = 0;
+
+		while ( true ) {
+			$pos = strpos( $scan, '. ', $offset );
+			if ( false === $pos ) {
+				break;
+			}
+
+			$candidate = substr( $scan, 0, $pos );
+			$rest      = trim( substr( $scan, $pos + 2 ) );
+
+			// A real author prefix is short; long prefixes are just the first sentence.
+			if ( '' === $candidate || strlen( $candidate ) > 60 || str_word_count( $candidate ) > 6 ) {
+				break;
+			}
+
+			// When the cut lands on an initial ("J. D. Vance. …" cuts at "J",
+			// "S.M. Beiko. …" cuts at "S.M"), the ". " belongs to the name —
+			// keep scanning for the period that actually ends the prefix.
+			$space     = strrpos( $candidate, ' ' );
+			$last_word = false === $space ? $candidate : substr( $candidate, $space + 1 );
+			if ( preg_match( '/^[A-Z](\.[A-Z])*$/', $last_word ) ) {
+				if ( str_word_count( $candidate ) >= 2 ) {
+					$fallback = [ $candidate, $rest ];
+				}
+				$offset = $pos + 2;
+				continue;
+			}
+
+			return [ $candidate, $rest ];
 		}
 
-		$candidate = substr( $description, 0, $pos );
-		$rest      = trim( substr( $description, $pos + 2 ) );
-
-		// A real author prefix is short; long prefixes are just the first sentence.
-		if ( '' === $candidate || strlen( $candidate ) > 60 || str_word_count( $candidate ) > 6 ) {
-			return [ '', $description ];
+		// Scanning ran past the caps or out of text while extending initials —
+		// a name ending in an initial ("Malcolm X. Long prose…") is still valid.
+		if ( null !== $fallback ) {
+			return $fallback;
 		}
 
-		// The feed sometimes prefixes audio items with "By Author Name".
-		$candidate = preg_replace( '/^by\s+/i', '', $candidate );
-
-		return [ $candidate, $rest ];
+		return [ '', $description ];
 	}
 
 	/**

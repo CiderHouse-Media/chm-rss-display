@@ -4,7 +4,7 @@ Tags: elementor, rss, feed, carousel, books
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.2.1
+Stable tag: 1.2.2
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -74,6 +74,10 @@ No. Elementor (free, 3.20+) is required; the plugin registers an Elementor widge
 4. Widget controls in the Elementor panel
 
 == Changelog ==
+
+= 1.2.2 =
+* Fixed: authors with initials ("J. D. Vance", "S.M. Beiko") were truncated at the first initial; the split between author and description now scans past initials to the end of the name
+* Fixed: authors prefixed with "By" in the feed could be dropped entirely when the full name ran past the length guard
 
 = 1.2.1 =
 * Removed: the 1.2.0 background feed-refresh system — it could overload smaller servers and added complexity without real benefit for weekly feeds. Freshness is governed by the Cache Duration setting; plugin updates always start from a fresh cache.

@@ -21,7 +21,7 @@ WordPress plugin by Cider House Media (`ciderhouse.media`). Registers one Elemen
 1. **UTF-8 BOM** before the XML declaration — stripped before `DOMDocument::loadXML`.
 2. **Cover image exists ONLY in `content:encoded` CDATA HTML** (`img src` on `wowbrary.blob.core.windows.net`, ~160×127px). No enclosure/media:content. Parsed via a second DOMDocument pass.
 3. **`pubDate` is NOT RFC-822**: `7/7/2026 7:56:30 PM`. Parsed with `DateTime::createFromFormat('n/j/Y g:i:s A', …, America/New_York)`, `strtotime` fallback, null fallback.
-4. **`description` = "Author Name. Description…"** — split on first `". "`; prefixes > 60 chars or > 6 words are treated as prose, and a leading `"By "` is stripped.
+4. **`description` = "Author Name. Description…"** — a leading `"By "` is stripped first, then split on the `". "` that ends the name: when the cut lands on an initial ("J. D. Vance" cuts at "J", "S.M. Beiko" at "S.M") scanning continues to the next `". "` (1.2.2 fix — do not revert to first-`". "`). Prefixes > 60 chars or > 6 words are treated as prose; if scanning overruns the caps, the last name-shaped candidate ending in an initial ("Malcolm X.") is used.
 5. Item `link` = Wowbrary redirect → CW Mars catalog borrow page; ISBN is in the link's `i=` query param (17/20 items have one).
 6. Feed host **blocks generic crawlers** — fetches send a descriptive UA (`CHM-RSS-Display/{ver}; +{home_url}`), filterable via `chm_rss_user_agent`.
 

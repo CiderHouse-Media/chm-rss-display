@@ -86,6 +86,9 @@ chm-rss-display/
 
 ## Changelog
 
+### 1.2.2
+- Fixed author-name truncation at initials ("J. D. Vance" → "J"); the author/description split now scans past initials and handles "By"-prefixed names
+
 ### 1.2.1
 - Removed the background feed-refresh cron (server-load risk, little benefit for weekly feeds); freshness = Cache Duration setting
 
