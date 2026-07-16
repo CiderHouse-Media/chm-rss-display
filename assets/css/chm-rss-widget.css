@@ -266,8 +266,11 @@
 	font-size: 17px;
 }
 
+/* List view shows the full trimmed description — the widget's
+   Description Length (words) setting is the only limiter here. */
 .chm-rss-card--row .chm-rss-card__desc {
-	-webkit-line-clamp: 2;
+	display: block;
+	-webkit-line-clamp: unset;
 }
 
 .chm-rss-card--row .chm-rss-card__foot {
@@ -278,7 +281,7 @@
 	.chm-rss-card--row { gap: 14px; padding: 12px; }
 	.chm-rss-card--row .chm-rss-card__media { flex-basis: 72px; width: 72px; }
 	.chm-rss-card--row .chm-rss-card__title { font-size: 14px; }
-	.chm-rss-card--row .chm-rss-card__desc { display: none; }
+	.chm-rss-card--row .chm-rss-card__desc { display: -webkit-box; -webkit-line-clamp: 3; }
 }
 
 /* ------------------------------------------------------------ Carousel */

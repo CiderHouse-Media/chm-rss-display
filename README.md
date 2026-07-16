@@ -86,6 +86,9 @@ chm-rss-display/
 
 ## Changelog
 
+### 1.2.3
+- Description Length now actually governs List view (a CSS 2-line clamp was overriding it); carousel/grid keep a 3-line visual cap; mobile list shows 3 lines instead of hiding descriptions
+
 ### 1.2.2
 - Fixed author-name truncation at initials ("J. D. Vance" → "J"); the author/description split now scans past initials and handles "By"-prefixed names
 

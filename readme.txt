@@ -4,7 +4,7 @@ Tags: elementor, rss, feed, carousel, books
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.2.2
+Stable tag: 1.2.3
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -74,6 +74,10 @@ No. Elementor (free, 3.20+) is required; the plugin registers an Elementor widge
 4. Widget controls in the Elementor panel
 
 == Changelog ==
+
+= 1.2.3 =
+* Fixed: the Description Length setting had no visible effect in List view — a stylesheet rule clamped descriptions to 2 lines regardless. List view now shows the full trimmed text; Carousel/Grid cards keep a 3-line cap for even card heights
+* Improved: List view descriptions on small screens show 3 lines instead of being hidden
 
 = 1.2.2 =
 * Fixed: authors with initials ("J. D. Vance", "S.M. Beiko") were truncated at the first initial; the split between author and description now scans past initials to the end of the name

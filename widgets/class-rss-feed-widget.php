@@ -330,7 +330,7 @@ class Rss_Feed_Widget extends Widget_Base {
 				'default'   => 25,
 				'min'       => 5,
 				'max'       => 300,
-				'description' => esc_html__( 'Set high (e.g. 300) to show full descriptions — useful in List view.', 'chm-rss-display' ),
+				'description' => esc_html__( 'List view shows this many words in full. Carousel and Grid cards also cap the description at 3 visible lines to keep card heights even.', 'chm-rss-display' ),
 				'condition' => [ 'show_description' => 'yes' ],
 			]
 		);
