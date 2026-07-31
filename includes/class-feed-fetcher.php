@@ -395,6 +395,7 @@ class Feed_Fetcher {
 			if ( isset( $cache[ $item->isbn ] ) ) {
 				$entry = $cache[ $item->isbn ];
 				if ( ! empty( $entry['h'] ) ) {
+					$item->thumb = $item->image;
 					$item->image = esc_url_raw( $jacket, [ 'https' ] );
 					continue;
 				}
@@ -417,6 +418,7 @@ class Feed_Fetcher {
 			$dirty                 = true;
 
 			if ( $hit ) {
+				$item->thumb = $item->image;
 				$item->image = esc_url_raw( $jacket, [ 'https' ] );
 			}
 		}

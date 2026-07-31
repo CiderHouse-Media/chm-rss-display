@@ -4,7 +4,7 @@ Tags: elementor, rss, feed, carousel, books
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.2.3
+Stable tag: 1.2.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -74,6 +74,9 @@ No. Elementor (free, 3.20+) is required; the plugin registers an Elementor widge
 4. Widget controls in the Elementor panel
 
 == Changelog ==
+
+= 1.2.4 =
+* New: broken cover images now fall back gracefully in the browser — first to the feed's own thumbnail (when an Enhanced hi-res cover fails to load, e.g. the catalog's image host is down), then to the styled no-cover placeholder. Broken-image icons can no longer appear
 
 = 1.2.3 =
 * Fixed: the Description Length setting had no visible effect in List view — a stylesheet rule clamped descriptions to 2 lines regardless. List view now shows the full trimmed text; Carousel/Grid cards keep a 3-line cap for even card heights

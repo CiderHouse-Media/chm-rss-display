@@ -1312,10 +1312,14 @@ class Rss_Feed_Widget extends Widget_Base {
 					'<span class="chm-rss-card__media-bg" style="background-image:url(%s)" aria-hidden="true"></span>',
 					esc_url( $item->image )
 				);
+				$fallback = ( '' !== $item->thumb && $item->thumb !== $item->image )
+					? sprintf( ' data-fallback="%s"', esc_url( $item->thumb ) )
+					: '';
 				printf(
-					'<img class="chm-rss-card__img" src="%s" alt="%s" loading="lazy" decoding="async">',
+					'<img class="chm-rss-card__img" src="%s" alt="%s"%s loading="lazy" decoding="async">',
 					esc_url( $item->image ),
-					esc_attr( $item->title )
+					esc_attr( $item->title ),
+					$fallback // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped when built above.
 				);
 			} else {
 				echo '<div class="chm-rss-card__placeholder">';

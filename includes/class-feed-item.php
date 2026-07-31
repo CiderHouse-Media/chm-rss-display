@@ -26,6 +26,9 @@ class Feed_Item {
 	/** @var string Cover image URL extracted from content:encoded. May be empty. */
 	public $image = '';
 
+	/** @var string Original feed thumbnail, kept when a hi-res cover replaces $image — the browser falls back to it if the hi-res host fails. May be empty. */
+	public $thumb = '';
+
 	/** @var int|null Unix timestamp, or null when the pubDate could not be parsed. */
 	public $timestamp = null;
 

@@ -86,6 +86,9 @@ chm-rss-display/
 
 ## Changelog
 
+### 1.2.4
+- Browser-side cover fallback chain: hi-res jacket → feed thumbnail (`data-fallback`) → styled placeholder; a down catalog host (e.g. bark.cwmars.org outage) can no longer produce broken images
+
 ### 1.2.3
 - Description Length now actually governs List view (a CSS 2-line clamp was overriding it); carousel/grid keep a 3-line visual cap; mobile list shows 3 lines instead of hiding descriptions
 

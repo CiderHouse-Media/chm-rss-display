@@ -3,7 +3,7 @@
  * Plugin Name:       CHM RSS Display
  * Plugin URI:        https://github.com/CiderHouse-Media/chm-rss-display
  * Description:       Display an external RSS feed as a customizable carousel, grid, or list in Elementor. Optimized for Wowbrary library feeds. Display only — never imports posts.
- * Version:           1.2.3
+ * Version:           1.2.4
  * Requires at least: 6.5
  * Requires PHP:      7.4
  * Author:            Cider House Media
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CHM_RSS_VERSION', '1.2.3' );
+define( 'CHM_RSS_VERSION', '1.2.4' );
 define( 'CHM_RSS_FILE', __FILE__ );
 define( 'CHM_RSS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'CHM_RSS_URL', plugin_dir_url( __FILE__ ) );

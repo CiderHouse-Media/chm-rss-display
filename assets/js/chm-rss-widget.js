@@ -130,12 +130,67 @@
 		}
 	}
 
+	function applyImageFallback( img ) {
+		var media = img.closest( '.chm-rss-card__media' );
+		var fallback = img.getAttribute( 'data-fallback' );
+
+		// Hi-res cover failed — drop to the feed's own thumbnail first.
+		// If that fails too, the error handler runs again and lands below.
+		if ( fallback && img.getAttribute( 'src' ) !== fallback ) {
+			img.setAttribute( 'src', fallback );
+			if ( media ) {
+				var bg = media.querySelector( '.chm-rss-card__media-bg' );
+				if ( bg ) {
+					bg.style.backgroundImage = 'url(' + fallback + ')';
+				}
+			}
+			return;
+		}
+
+		// Nothing left to try — swap in the standard no-cover placeholder.
+		if ( ! media || media.querySelector( '.chm-rss-card__placeholder' ) ) {
+			return;
+		}
+		var ph = document.createElement( 'div' );
+		ph.className = 'chm-rss-card__placeholder';
+		var book = document.createElement( 'span' );
+		book.className = 'chm-rss-card__placeholder-book';
+		book.setAttribute( 'aria-hidden', 'true' );
+		var title = document.createElement( 'span' );
+		title.className = 'chm-rss-card__placeholder-title';
+		title.textContent = img.getAttribute( 'alt' ) || '';
+		var note = document.createElement( 'span' );
+		note.className = 'chm-rss-card__placeholder-note';
+		note.textContent = 'cover unavailable';
+		ph.appendChild( book );
+		ph.appendChild( title );
+		ph.appendChild( note );
+		media.innerHTML = '';
+		media.appendChild( ph );
+	}
+
+	function initImageFallback( scope ) {
+		var imgs = scope.querySelectorAll( '.chm-rss-card__img' );
+		for ( var i = 0; i < imgs.length; i++ ) {
+			(function ( img ) {
+				img.addEventListener( 'error', function () {
+					applyImageFallback( img );
+				} );
+				// Already failed before we attached (cached error).
+				if ( img.complete && img.naturalWidth === 0 && img.getAttribute( 'src' ) ) {
+					applyImageFallback( img );
+				}
+			})( imgs[ i ] );
+		}
+	}
+
 	function initScope( scope ) {
 		var carousels = scope.querySelectorAll( '.chm-rss__carousel' );
 		for ( var i = 0; i < carousels.length; i++ ) {
 			initCarousel( carousels[ i ] );
 		}
 		initLoadMore( scope );
+		initImageFallback( scope );
 	}
 
 	// Elementor context (frontend + editor live preview).
